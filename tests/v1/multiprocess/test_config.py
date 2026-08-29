@@ -18,10 +18,13 @@ import pytest
 from lmcache.v1.multiprocess.config import (
     CoordinatorConfig,
     MPServerConfig,
+    P2PConfig,
     add_coordinator_args,
     add_mp_server_args,
+    add_p2p_args,
     parse_args_to_coordinator_config,
     parse_args_to_mp_server_config,
+    parse_args_to_p2p_config,
 )
 
 _COORD_ENV = (
@@ -37,6 +40,12 @@ def _parse(argv: list[str]) -> CoordinatorConfig:
     parser = argparse.ArgumentParser()
     add_coordinator_args(parser)
     return parse_args_to_coordinator_config(parser.parse_args(argv))
+
+
+def _parse_p2p(argv: list[str]) -> P2PConfig:
+    parser = argparse.ArgumentParser()
+    add_p2p_args(parser)
+    return parse_args_to_p2p_config(parser.parse_args(argv))
 
 
 @pytest.fixture(autouse=True)
@@ -283,3 +292,17 @@ def test_deprecated_flags_log_warning():
 def test_deprecated_flush_interval_flag_rejects_nonpositive():
     with pytest.raises(ValueError):
         _parse(["--coordinator-l2-event-flush-interval", "0"])
+
+
+def test_p2p_max_peer_misses_defaults_to_three():
+    assert _parse_p2p([]).max_peer_misses == 3
+
+
+@pytest.mark.parametrize("misses", ["0", "1", "10"])
+def test_p2p_max_peer_misses_flag_is_parsed(misses):
+    assert _parse_p2p(["--p2p-max-peer-misses", misses]).max_peer_misses == int(misses)
+
+
+def test_negative_p2p_max_peer_misses_rejected():
+    with pytest.raises(ValueError, match="p2p max peer misses must be >= 0"):
+        _parse_p2p(["--p2p-max-peer-misses", "-1"])

@@ -87,6 +87,9 @@ P2P is enabled per server by the ``--p2p-advertise-url`` flag. The relevant
        (default ``30``).
    * - ``--p2p-transfer-engine ENGINE``
      - Transfer-channel implementation (default ``nixl``).
+   * - ``--p2p-max-peer-misses COUNT``
+     - Consecutive coordinator poll misses a peer may be absent for before its
+       adapter is removed (default ``3``).
 
 P2P also reuses the coordinator connection flags (``--coordinator-url``,
 ``--coordinator-advertise-ip``, ``--coordinator-heartbeat-interval``); the

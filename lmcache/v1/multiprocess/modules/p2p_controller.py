@@ -47,9 +47,6 @@ logger = init_logger(__name__)
 # Sentinel address for keys that were not found (or fell past the L1 prefix).
 _INVALID_ADDRESS = TransferChannelAddress(offset=-1, size=0)
 
-# Consecutive missed polls a peer may be absent before its adapter is removed.
-_MAX_MISSES = 3
-
 
 class _P2PState(Enum):
     """Registration state of this instance as seen by the coordinator."""
@@ -498,7 +495,7 @@ class P2PController:
                 continue
             adapter = self._adapters[peer_id]
             adapter.consecutive_misses += 1
-            if adapter.consecutive_misses > _MAX_MISSES:
+            if adapter.consecutive_misses > self._p2p_config.max_peer_misses:
                 self._remove_adapter(peer_id)
                 removed += 1
         return added, removed

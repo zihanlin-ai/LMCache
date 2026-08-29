@@ -238,6 +238,10 @@ is set, which additionally requires a coordinator URL via
    * - ``--p2p-transfer-engine``
      - ``nixl``
      - Transfer-channel implementation to use.
+   * - ``--p2p-max-peer-misses``
+     - ``3``
+     - Consecutive coordinator poll misses a peer may be absent for before its
+       adapter is removed.
 
 L1 Memory Manager
 ------------------

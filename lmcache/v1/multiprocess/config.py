@@ -178,6 +178,21 @@ class P2PConfig:
     transfer_engine: str = "nixl"
     """Transfer-channel implementation to use."""
 
+    max_peer_misses: int = 3
+    """Consecutive coordinator poll misses a peer may be absent for before its
+    adapter is removed. 0 removes a peer on its first missed poll."""
+
+    def __post_init__(self) -> None:
+        """Validate the peer-miss budget.
+
+        Raises:
+            ValueError: If the miss budget is negative.
+        """
+        if self.max_peer_misses < 0:
+            raise ValueError(
+                f"p2p max peer misses must be >= 0; got {self.max_peer_misses}"
+            )
+
     @property
     def enabled(self) -> bool:
         """Whether P2P is enabled (an advertise URL is configured)."""
@@ -528,6 +543,13 @@ def add_p2p_args(
         default="nixl",
         help="Transfer-channel implementation to use. Default is nixl.",
     )
+    group.add_argument(
+        "--p2p-max-peer-misses",
+        type=int,
+        default=3,
+        help="Consecutive coordinator poll misses a peer may be absent for "
+        "before its adapter is removed. Default is 3.",
+    )
     return parser
 
 
@@ -548,6 +570,7 @@ def parse_args_to_p2p_config(
         lookup_timeout=getattr(args, "p2p_lookup_timeout", 30.0),
         load_timeout=getattr(args, "p2p_load_timeout", 30.0),
         transfer_engine=getattr(args, "p2p_transfer_engine", "nixl"),
+        max_peer_misses=getattr(args, "p2p_max_peer_misses", 3),
     )
 
 

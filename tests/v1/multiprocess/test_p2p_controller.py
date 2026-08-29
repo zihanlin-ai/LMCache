@@ -18,7 +18,6 @@ from lmcache.v1.distributed.l2_adapters.p2p_l2_adapter import P2PL2AdapterConfig
 from lmcache.v1.distributed.transfer_channel.api import TransferChannelAddress
 from lmcache.v1.multiprocess.config import CoordinatorConfig, P2PConfig
 from lmcache.v1.multiprocess.modules.p2p_controller import (
-    _MAX_MISSES,
     P2PController,
     _P2PState,
     _PeerInstance,
@@ -153,12 +152,14 @@ def test_transfer_channel_address_validity():
 # ============================================================================
 
 
-def _make_controller() -> tuple[P2PController, MagicMock]:
+def _make_controller(
+    p2p_config: P2PConfig | None = None,
+) -> tuple[P2PController, MagicMock]:
     """Build a P2P-disabled controller (no thread / transfer channel)."""
     ctx = MagicMock()
     controller = P2PController(
         ctx,
-        P2PConfig(),
+        p2p_config or P2PConfig(),
         CoordinatorConfig(),
         instance_id="self",
     )
@@ -376,12 +377,13 @@ def test_reconcile_no_op_when_peer_unchanged():
 
 
 def test_reconcile_keeps_peer_within_grace():
-    """A peer absent for up to _MAX_MISSES cycles keeps its adapter."""
-    controller, ctx = _make_controller()
+    """A peer absent for up to the configured budget keeps its adapter."""
+    config = P2PConfig()
+    controller, ctx = _make_controller(config)
     ctx.storage_manager.add_l2_adapter.return_value = 7
 
     controller._apply_state(_P2PState.REGISTERED, {"peerA": _peer("peerA")})
-    for _ in range(_MAX_MISSES):
+    for _ in range(config.max_peer_misses):
         controller._apply_state(_P2PState.REGISTERED, {})
 
     ctx.storage_manager.delete_l2_adapter.assert_not_called()
@@ -389,16 +391,42 @@ def test_reconcile_keeps_peer_within_grace():
 
 
 def test_reconcile_removes_peer_after_grace():
-    """A peer absent beyond _MAX_MISSES cycles has its adapter removed."""
-    controller, ctx = _make_controller()
+    """A peer absent beyond the configured budget has its adapter removed."""
+    config = P2PConfig()
+    controller, ctx = _make_controller(config)
     ctx.storage_manager.add_l2_adapter.return_value = 7
 
     controller._apply_state(_P2PState.REGISTERED, {"peerA": _peer("peerA")})
-    for _ in range(_MAX_MISSES + 1):
+    for _ in range(config.max_peer_misses + 1):
         controller._apply_state(_P2PState.REGISTERED, {})
 
     ctx.storage_manager.delete_l2_adapter.assert_called_once_with(7)
     assert controller.report_status()["p2p_peers"] == []
+
+
+def test_reconcile_honors_configured_peer_miss_budget():
+    """The budget comes from P2PConfig, not from a fixed default."""
+    controller, ctx = _make_controller(P2PConfig(max_peer_misses=1))
+    ctx.storage_manager.add_l2_adapter.return_value = 7
+
+    controller._apply_state(_P2PState.REGISTERED, {"peerA": _peer("peerA")})
+    controller._apply_state(_P2PState.REGISTERED, {})
+    ctx.storage_manager.delete_l2_adapter.assert_not_called()
+
+    controller._apply_state(_P2PState.REGISTERED, {})
+    ctx.storage_manager.delete_l2_adapter.assert_called_once_with(7)
+    assert controller.report_status()["p2p_peers"] == []
+
+
+def test_reconcile_removes_peer_immediately_when_budget_is_zero():
+    """A zero budget drops a peer on its first missed poll."""
+    controller, ctx = _make_controller(P2PConfig(max_peer_misses=0))
+    ctx.storage_manager.add_l2_adapter.return_value = 7
+
+    controller._apply_state(_P2PState.REGISTERED, {"peerA": _peer("peerA")})
+    controller._apply_state(_P2PState.REGISTERED, {})
+
+    ctx.storage_manager.delete_l2_adapter.assert_called_once_with(7)
 
 
 def test_reconcile_readds_on_url_change():

@@ -95,6 +95,9 @@ Commonly used flags include:
        (default ``30``).
    * - ``--p2p-transfer-engine ENGINE``
      - Transfer-channel implementation for P2P reads (default ``nixl``).
+   * - ``--p2p-max-peer-misses COUNT``
+     - Consecutive coordinator poll misses a peer may be absent for before its
+       adapter is removed (default ``3``).
    * - ``--trace-level {storage}``
      - Enable storage-level trace recording (see :doc:`trace`).
    * - ``--trace-output PATH``
